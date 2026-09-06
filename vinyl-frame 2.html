@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ใส่รูปลงแผ่นเสียง</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-0:#0b0a0d;
+    --bg-1:#151217;
+    --vinyl-0:#1c1a20;
+    --vinyl-1:#0e0d10;
+    --groove:#2c2933;
+    --label-paper:#ecdfc0;
+    --label-gold:#c99a3a;
+    --spindle:#a5382c;
+    --cream:#ece5d6;
+    --cream-dim:#a89f8f;
+    --line: rgba(236,229,214,0.12);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 700px at 78% 15%, #241d1a 0%, transparent 60%),
+      radial-gradient(900px 600px at 10% 90%, #1a1620 0%, transparent 55%),
+      var(--bg-0);
+    color:var(--cream);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+
+  .noise{
+    position:fixed; inset:0; pointer-events:none; opacity:0.05; mix-blend-mode:overlay; z-index:5;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .wrap{
+    max-width:1180px;
+    margin:0 auto;
+    padding:56px 32px 90px;
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:40px;
+    align-items:center;
+    min-height:100vh;
+  }
+
+  .left{ padding-right:12px; }
+
+  .kicker{
+    font-family:'Bebas Neue', sans-serif;
+    letter-spacing:0.04em;
+    font-size:15px;
+    color:var(--label-gold);
+    margin:0 0 18px;
+  }
+
+  h1{
+    font-family:'Bebas Neue', sans-serif;
+    font-weight:400;
+    font-size:clamp(48px, 6vw, 84px);
+    line-height:0.94;
+    letter-spacing:0.005em;
+    margin:0 0 22px;
+    color:var(--cream);
+  }
+  h1 span{ color:var(--label-gold); }
+
+  .lede{
+    font-size:17px;
+    line-height:1.65;
+    color:var(--cream-dim);
+    max-width:46ch;
+    margin:0 0 34px;
+  }
+
+  .panel{
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:22px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+  }
+
+  .drop{
+    border:1.5px dashed rgba(236,229,214,0.28);
+    border-radius:10px;
+    padding:26px 20px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .2s ease, background .2s ease;
+    position:relative;
+  }
+  .drop:hover, .drop.drag{
+    border-color:var(--label-gold);
+    background:rgba(201,154,58,0.06);
+  }
+  .drop input{
+    position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%;
+  }
+  .drop-title{ font-size:15px; font-weight:600; margin-bottom:4px; }
+  .drop-sub{ font-size:13px; color:var(--cream-dim); }
+
+  .row{
+    display:flex; gap:12px; margin-top:16px; flex-wrap:wrap;
+  }
+
+  button.action{
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:14px;
+    color:var(--bg-0);
+    background:var(--label-gold);
+    border:none;
+    padding:12px 20px;
+    border-radius:8px;
+    cursor:pointer;
+    transition:transform .15s ease, filter .15s ease;
+  }
+  button.action:hover{ filter:brightness(1.08); transform:translateY(-1px); }
+  button.action:active{ transform:translateY(0); }
+  button.action:disabled{ opacity:0.35; cursor:not-allowed; transform:none; }
+
+  button.ghost{
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:14px;
+    color:var(--cream);
+    background:transparent;
+    border:1px solid var(--line);
+    padding:12px 20px;
+    border-radius:8px;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  button.ghost:hover{ border-color:var(--cream-dim); background:rgba(255,255,255,0.03); }
+
+  .hint{ font-size:12.5px; color:var(--cream-dim); margin-top:14px; line-height:1.5; }
+  .hint b{ color:var(--cream); font-weight:600; }
+
+  /* --- Right stage --- */
+  .stage{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    perspective:1400px;
+    padding:20px;
+  }
+
+  .rig{
+    position:relative;
+    width:min(420px, 80vw);
+    aspect-ratio:1/1;
+    transform-style:preserve-3d;
+    transition: transform .25s cubic-bezier(.2,.8,.2,1);
+    will-change:transform;
+  }
+
+  .shadow-blob{
+    position:absolute;
+    left:6%; right:6%; bottom:-6%;
+    height:16%;
+    background:radial-gradient(ellipse at center, rgba(0,0,0,0.55), transparent 70%);
+    filter:blur(6px);
+    transform:translateZ(-40px) scale(1);
+    z-index:0;
+  }
+
+  .disc{
+    position:absolute; inset:0;
+    border-radius:50%;
+    background:
+      repeating-radial-gradient(circle at 50% 50%,
+        var(--groove) 0px, var(--groove) 1px,
+        var(--vinyl-0) 1px, var(--vinyl-0) 4px);
+    box-shadow:
+      0 30px 60px -20px rgba(0,0,0,0.7),
+      inset 0 0 0 1px rgba(255,255,255,0.04),
+      inset 0 8px 30px rgba(0,0,0,0.5);
+    transform:translateZ(0);
+  }
+
+  .disc::before{
+    content:"";
+    position:absolute; inset:0;
+    border-radius:50%;
+    background:conic-gradient(from 200deg, rgba(255,255,255,0.10), transparent 30%, transparent 60%, rgba(255,255,255,0.06) 75%, transparent 100%);
+    mix-blend-mode:screen;
+    pointer-events:none;
+  }
+
+  .disc.spin{
+    animation: spin 3.2s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .label{
+    position:absolute;
+    left:50%; top:50%;
+    width:42%; height:42%;
+    transform:translate(-50%,-50%);
+    border-radius:50%;
+    background:var(--label-paper);
+    overflow:hidden;
+    box-shadow:
+      0 0 0 3px var(--label-gold),
+      0 0 0 4px rgba(0,0,0,0.4),
+      inset 0 2px 8px rgba(0,0,0,0.25);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .label img{
+    width:100%; height:100%; object-fit:cover;
+    display:block;
+  }
+  .label .placeholder-text{
+    font-family:'Bebas Neue', sans-serif;
+    font-size:13px;
+    letter-spacing:0.03em;
+    color:#8a6f2e;
+    text-align:center;
+    padding:8px;
+    line-height:1.3;
+  }
+
+  .spindle{
+    position:absolute; left:50%; top:50%;
+    width:14px; height:14px;
+    transform:translate(-50%,-50%);
+    background:var(--spindle);
+    border-radius:50%;
+    box-shadow:0 0 0 3px rgba(0,0,0,0.35), inset 0 1px 2px rgba(255,255,255,0.3);
+    z-index:2;
+  }
+
+  .tonearm{
+    position:absolute;
+    right:-6%;
+    top:-8%;
+    width:40%;
+    height:40%;
+    transform-origin: 90% 10%;
+    transform: translateZ(30px) rotate(18deg);
+    transition: transform .6s cubic-bezier(.2,.8,.2,1);
+    pointer-events:none;
+    opacity:0.92;
+  }
+  .rig.playing .tonearm{ transform: translateZ(30px) rotate(2deg); }
+
+  .tonearm svg{ width:100%; height:100%; }
+
+  @media (max-width: 880px){
+    .wrap{ grid-template-columns:1fr; padding:36px 20px 60px; min-height:auto; }
+    .stage{ order:-1; padding:0 0 8px; }
+    .left{ padding-right:0; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .rig, .disc.spin, .tonearm{ transition:none !important; animation:none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+
+<div class="wrap">
+  <div class="left">
+    <p class="kicker">SIDE A — PHOTO PRESS</p>
+    <h1>ใส่รูปคุณ<br>ลง<span>แผ่นเสียง</span></h1>
+    <p class="lede">อัปโหลดรูปที่ชอบ แล้วดูมันกลายเป็นแผ่นไวนิลทรง 3D หมุนได้ ลากเมาส์เพื่อเอียงมุมมอง กดเล่นให้มันหมุน แล้วดาวน์โหลดเก็บไว้เท่ๆ</p>
+
+    <div class="panel">
+      <label class="drop" id="drop">
+        <input type="file" id="fileInput" accept="image/*">
+        <div class="drop-title" id="dropTitle">ลากรูปมาวาง หรือคลิกเพื่อเลือกไฟล์</div>
+        <div class="drop-sub">แนะนำภาพสี่เหลี่ยมจัตุรัส เพื่อผลลัพธ์ที่คมชัดที่สุด</div>
+      </label>
+
+      <div class="row">
+        <button class="action" id="playBtn" disabled>▶ เล่นแผ่น</button>
+        <button class="ghost" id="downloadBtn" disabled>ดาวน์โหลด PNG</button>
+        <button class="ghost" id="gifBtn" disabled>ดาวน์โหลด GIF หมุนได้</button>
+        <button class="ghost" id="resetBtn" disabled>เริ่มใหม่</button>
+      </div>
+
+      <p class="hint" id="gifStatus"><b>เคล็ดลับ:</b> ขยับเมาส์เหนือแผ่นเสียงเพื่อดูมุมมอง 3D แบบพารัลแลกซ์ บนมือถือลองเอียงจอดูก็ได้</p>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="rig" id="rig">
+      <div class="shadow-blob"></div>
+      <div class="tonearm">
+        <svg viewBox="0 0 200 200">
+          <line x1="180" y1="20" x2="60" y2="150" stroke="#3a3a40" stroke-width="8" stroke-linecap="round"/>
+          <circle cx="180" cy="20" r="14" fill="#2a2a2e" stroke="#c99a3a" stroke-width="2"/>
+          <path d="M60 150 L40 165 L55 178 L75 163 Z" fill="#2a2a2e" stroke="#c99a3a" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <div class="disc" id="disc">
+        <div class="spindle"></div>
+        <div class="label" id="label">
+          <div class="placeholder-text" id="placeholderText">ยังไม่มีรูป<br>SIDE&nbsp;A</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<canvas id="exportCanvas" width="1000" height="1000" style="display:none;"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js"></script>
+<script>
+(function(){
+  const fileInput = document.getElementById('fileInput');
+  const drop = document.getElementById('drop');
+  const dropTitle = document.getElementById('dropTitle');
+  const label = document.getElementById('label');
+  const placeholderText = document.getElementById('placeholderText');
+  const disc = document.getElementById('disc');
+  const rig = document.getElementById('rig');
+  const stage = document.getElementById('stage');
+  const playBtn = document.getElementById('playBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const gifBtn = document.getElementById('gifBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const gifStatus = document.getElementById('gifStatus');
+  const defaultHintHTML = gifStatus.innerHTML;
+
+  let imgDataUrl = null;
+  let playing = false;
+  let workerBlobUrl = null;
+
+  // Pre-fetch the gif.js worker script once and turn it into a same-origin
+  // blob URL, so the Worker() constructor doesn't hit cross-origin errors.
+  function ensureWorkerBlob(){
+    if(workerBlobUrl) return Promise.resolve(workerBlobUrl);
+    return fetch('https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js')
+      .then(r => r.blob())
+      .then(blob => {
+        workerBlobUrl = URL.createObjectURL(blob);
+        return workerBlobUrl;
+      });
+  }
+
+  function loadImage(file){
+    if(!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      imgDataUrl = e.target.result;
+      placeholderText.style.display = 'none';
+      const existing = label.querySelector('img');
+      if(existing) existing.remove();
+      const imgEl = document.createElement('img');
+      imgEl.src = imgDataUrl;
+      label.appendChild(imgEl);
+      dropTitle.textContent = 'เปลี่ยนรูปใหม่';
+      playBtn.disabled = false;
+      downloadBtn.disabled = false;
+      gifBtn.disabled = false;
+      resetBtn.disabled = false;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  fileInput.addEventListener('change', e => loadImage(e.target.files[0]));
+
+  ['dragenter','dragover'].forEach(evt => {
+    drop.addEventListener(evt, e => { e.preventDefault(); drop.classList.add('drag'); });
+  });
+  ['dragleave','drop'].forEach(evt => {
+    drop.addEventListener(evt, e => { e.preventDefault(); drop.classList.remove('drag'); });
+  });
+  drop.addEventListener('drop', e => {
+    const f = e.dataTransfer.files[0];
+    if(f) loadImage(f);
+  });
+
+  // 3D tilt on mouse move
+  let rect = null;
+  stage.addEventListener('mousemove', e => {
+    rect = stage.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    const rotY = x * 26;
+    const rotX = -y * 26;
+    rig.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+  });
+  stage.addEventListener('mouseleave', () => {
+    rig.style.transform = 'rotateX(0deg) rotateY(0deg)';
+  });
+
+  // Device orientation for mobile (best-effort, no permission prompt spam)
+  window.addEventListener('deviceorientation', e => {
+    if(e.gamma == null || e.beta == null) return;
+    const rotY = Math.max(-26, Math.min(26, e.gamma));
+    const rotX = Math.max(-26, Math.min(26, (e.beta - 45) * -0.3));
+    rig.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+  });
+
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    disc.classList.toggle('spin', playing);
+    rig.classList.toggle('playing', playing);
+    playBtn.textContent = playing ? '⏸ หยุดแผ่น' : '▶ เล่นแผ่น';
+  });
+
+  resetBtn.addEventListener('click', () => {
+    imgDataUrl = null;
+    const existing = label.querySelector('img');
+    if(existing) existing.remove();
+    placeholderText.style.display = 'block';
+    dropTitle.textContent = 'ลากรูปมาวาง หรือคลิกเพื่อเลือกไฟล์';
+    playing = false;
+    disc.classList.remove('spin');
+    rig.classList.remove('playing');
+    playBtn.textContent = '▶ เล่นแผ่น';
+    playBtn.disabled = true;
+    downloadBtn.disabled = true;
+    gifBtn.disabled = true;
+    resetBtn.disabled = true;
+    gifStatus.innerHTML = defaultHintHTML;
+    fileInput.value = '';
+  });
+
+  downloadBtn.addEventListener('click', () => {
+    if(!imgDataUrl) return;
+    const canvas = document.getElementById('exportCanvas');
+    const ctx = canvas.getContext('2d');
+    const size = 1000;
+    const cx = size/2, cy = size/2;
+    ctx.clearRect(0,0,size,size);
+
+    // background transparent-ish soft shadow
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(cx, size*0.93, size*0.36, size*0.045, 0, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.filter = 'blur(10px)';
+    ctx.fill();
+    ctx.restore();
+
+    // vinyl disc grooves
+    const R = size*0.46;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI*2);
+    ctx.fillStyle = '#141318';
+    ctx.fill();
+    ctx.clip();
+    for(let r = R; r > R*0.2; r -= 4){
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI*2);
+      ctx.strokeStyle = (Math.floor(r) % 12 === 0) ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)';
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+    }
+    // subtle sheen
+    const grad = ctx.createRadialGradient(cx-R*0.4, cy-R*0.5, R*0.1, cx, cy, R*1.2);
+    grad.addColorStop(0, 'rgba(255,255,255,0.10)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    // label ring
+    const Rl = R*0.42;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, Rl+8, 0, Math.PI*2);
+    ctx.fillStyle = '#c99a3a';
+    ctx.fill();
+    ctx.restore();
+
+    const img = new Image();
+    img.onload = () => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, Rl, 0, Math.PI*2);
+      ctx.closePath();
+      ctx.fillStyle = '#ecdfc0';
+      ctx.fill();
+      ctx.clip();
+
+      // cover-fit image into circle
+      const iw = img.width, ih = img.height;
+      const scale = Math.max((Rl*2)/iw, (Rl*2)/ih);
+      const dw = iw*scale, dh = ih*scale;
+      ctx.drawImage(img, cx-dw/2, cy-dh/2, dw, dh);
+      ctx.restore();
+
+      // spindle
+      ctx.beginPath();
+      ctx.arc(cx, cy, 8, 0, Math.PI*2);
+      ctx.fillStyle = '#a5382c';
+      ctx.fill();
+
+      const link = document.createElement('a');
+      link.download = 'vinyl-photo.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    };
+    img.src = imgDataUrl;
+  });
+
+  // --- Draw one rotated frame of the record onto a given context ---
+  // The disc + label + photo all spin together; the tonearm stays fixed
+  // in its "resting on the record" position, same as when playing live.
+  function drawVinylFrame(ctx, size, img, angleDeg){
+    const cx = size * 0.46;
+    const cy = size * 0.54;
+    const R = size * 0.36;
+
+    ctx.clearRect(0, 0, size, size);
+    ctx.fillStyle = '#0b0a0d';
+    ctx.fillRect(0, 0, size, size);
+
+    // soft shadow under the disc
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + R * 1.12, R * 0.82, R * 0.11, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.filter = 'blur(10px)';
+    ctx.fill();
+    ctx.restore();
+
+    // rotated disc + grooves + label + photo
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angleDeg * Math.PI / 180);
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.fillStyle = '#141318';
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    for(let r = R; r > R * 0.2; r -= size * 0.008){
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.strokeStyle = (Math.floor(r) % 12 < 6) ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)';
+      ctx.lineWidth = size * 0.0028;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    const Rl = R * 0.42;
+    ctx.beginPath();
+    ctx.arc(0, 0, Rl + size * 0.008, 0, Math.PI * 2);
+    ctx.fillStyle = '#c99a3a';
+    ctx.fill();
+
+    if(img){
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, 0, Rl, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.fillStyle = '#ecdfc0';
+      ctx.fill();
+      ctx.clip();
+      const iw = img.width, ih = img.height;
+      const scale = Math.max((Rl * 2) / iw, (Rl * 2) / ih);
+      const dw = iw * scale, dh = ih * scale;
+      ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // fixed light sheen sweeping across the viewport (not rotating with disc)
+    const grad = ctx.createRadialGradient(cx - R * 0.4, cy - R * 0.5, R * 0.1, cx, cy, R * 1.2);
+    grad.addColorStop(0, 'rgba(255,255,255,0.09)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.restore();
+
+    // spindle (always centered, never rotates visually)
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.008, 0, Math.PI * 2);
+    ctx.fillStyle = '#a5382c';
+    ctx.fill();
+
+    // fixed tonearm resting on the edge of the record
+    ctx.save();
+    const pivotX = size * 0.90, pivotY = size * 0.06;
+    const headX = cx + R * 0.62, headY = cy - R * 0.42;
+    ctx.strokeStyle = '#3a3a40';
+    ctx.lineWidth = size * 0.014;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(pivotX, pivotY);
+    ctx.lineTo(headX, headY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(pivotX, pivotY, size * 0.024, 0, Math.PI * 2);
+    ctx.fillStyle = '#2a2a2e';
+    ctx.fill();
+    ctx.strokeStyle = '#c99a3a';
+    ctx.lineWidth = size * 0.004;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(headX, headY, size * 0.02, 0, Math.PI * 2);
+    ctx.fillStyle = '#2a2a2e';
+    ctx.fill();
+    ctx.strokeStyle = '#c99a3a';
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  gifBtn.addEventListener('click', () => {
+    if(!imgDataUrl || typeof GIF === 'undefined') return;
+    gifBtn.disabled = true;
+    downloadBtn.disabled = true;
+    resetBtn.disabled = true;
+    gifStatus.innerHTML = '<b>กำลังเตรียมเครื่องมือ…</b>';
+
+    ensureWorkerBlob().then(workerUrl => {
+      const size = 480;
+      const frameCanvas = document.createElement('canvas');
+      frameCanvas.width = size;
+      frameCanvas.height = size;
+      const ctx = frameCanvas.getContext('2d');
+
+      const img = new Image();
+      img.onload = () => {
+        const gif = new GIF({
+          workers: 2,
+          quality: 8,
+          workerScript: workerUrl,
+          width: size,
+          height: size
+        });
+
+        const totalFrames = 24;
+        const frameDelay = 90; // ms, ~2.2s per full spin loop
+        for(let i = 0; i < totalFrames; i++){
+          const angle = (360 / totalFrames) * i;
+          drawVinylFrame(ctx, size, img, angle);
+          gif.addFrame(ctx, { copy: true, delay: frameDelay });
+        }
+
+        gif.on('progress', p => {
+          gifStatus.innerHTML = `<b>กำลังเรนเดอร์ GIF… ${Math.round(p * 100)}%</b>`;
+        });
+
+        gif.on('finished', blob => {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.download = 'vinyl-photo-spin.gif';
+          link.href = url;
+          link.click();
+          gifStatus.innerHTML = defaultHintHTML;
+          gifBtn.disabled = false;
+          downloadBtn.disabled = false;
+          resetBtn.disabled = false;
+        });
+
+        gif.render();
+      };
+      img.src = imgDataUrl;
+    }).catch(() => {
+      gifStatus.innerHTML = '<b>สร้าง GIF ไม่สำเร็จ</b> ลองใหม่อีกครั้ง หรือเช็กการเชื่อมต่ออินเทอร์เน็ต';
+      gifBtn.disabled = false;
+      downloadBtn.disabled = false;
+      resetBtn.disabled = false;
+    });
+  });
+})();
+</script>
+</body>
+</html>
